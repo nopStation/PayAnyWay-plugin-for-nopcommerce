@@ -12,6 +12,7 @@ using Nop.Services.Localization;
 using Nop.Services.Payments;
 using Nop.Web.Framework;
 using System.Threading.Tasks;
+using Nop.Services.Orders;
 
 namespace Nop.Plugin.Payments.PayAnyWay
 {
@@ -24,11 +25,12 @@ namespace Nop.Plugin.Payments.PayAnyWay
 
         private readonly ICurrencyService _currencyService;
         private readonly ILocalizationService _localizationService;
-        private readonly IPaymentService _paymentService;
         private readonly ISettingService _settingService;
         private readonly IStoreContext _storeContext;
         private readonly IWebHelper _webHelper;
         private readonly CurrencySettings _currencySettings;
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IOrderTotalCalculationService _orderTotalCalculationService;
 
         const string MONETA_URL = "https://www.moneta.ru/assistant.htm";
         const string DEMO_MONETA_URL = "https://demo.moneta.ru/assistant.htm";
@@ -39,19 +41,21 @@ namespace Nop.Plugin.Payments.PayAnyWay
 
         public PayAnyWayPaymentProcessor(ICurrencyService currencyService,
             ILocalizationService localizationService,
-            IPaymentService paymentService,
             ISettingService settingService,
             IStoreContext storeContext,
             IWebHelper webHelper,
-            CurrencySettings currencySettings)
+            CurrencySettings currencySettings,
+            IHttpContextAccessor httpContextAccessor,
+            IOrderTotalCalculationService orderTotalCalculationService)
         {
             _currencyService = currencyService;
             _localizationService = localizationService;
-            _paymentService = paymentService;
             _settingService = settingService;
             _storeContext = storeContext;
             _webHelper = webHelper;
             _currencySettings = currencySettings;
+            _httpContextAccessor = httpContextAccessor;
+            _orderTotalCalculationService = orderTotalCalculationService;
         }
 
         #endregion
@@ -84,7 +88,7 @@ namespace Nop.Plugin.Payments.PayAnyWay
             var model = PayAnyWayPaymentRequest.CreatePayAnyWayPaymentRequest(payAnyWayPaymentSettings, customerId, orderGuid, orderTotal, currencyCode);
 
             //create and send post data
-            var post = new RemotePost
+            var post = new RemotePost(_httpContextAccessor,_webHelper)
             {
                 FormName = "PayPoint",
                 Url = payAnyWayPaymentSettings.MntDemoArea ? DEMO_MONETA_URL : MONETA_URL
@@ -129,7 +133,7 @@ namespace Nop.Plugin.Payments.PayAnyWay
         {
             var payAnyWayPaymentSettings = await _settingService.LoadSettingAsync<PayAnyWayPaymentSettings>(_storeContext.GetCurrentStore().Id);
 
-            var result = await _paymentService.CalculateAdditionalFeeAsync(cart,
+            var result = await _orderTotalCalculationService.CalculatePaymentAdditionalFeeAsync(cart,
                 payAnyWayPaymentSettings.AdditionalFee, payAnyWayPaymentSettings.AdditionalFeePercentage);
 
             return result;
